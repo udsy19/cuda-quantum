@@ -10,6 +10,11 @@ on:
         required: false
         type: string
         description: 'Optional: URL of a cuda-quantum runtime wheel artifact (e.g. .../actions/runs/RUN_ID/artifacts/ARTIFACT_ID). Defaults to the latest CI run on main.'
+  # Self-hosted runners reject pull_request events; copy-pr-bot mirrors PR heads
+  # onto pull-request/N branches. See https://docs.gha-runners.nvidia.com/pull-request-testing/
+  push:
+    branches:
+      - "pull-request/[0-9]+"
 
 jobs:
   build_devel_wheel:
