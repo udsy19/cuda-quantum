@@ -9,13 +9,52 @@
 #include "common/AnalogHamiltonian.h"
 #include "common/EvolveResult.h"
 #include "cudaq.h"
+#include "cudaq/algorithms/launch.h"
 #include "cudaq/operators.h"
 #include "cudaq/runtime/logger/logger.h"
 #include "cudaq/schedule.h"
 #include <random>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 namespace cudaq::detail {
+
+sample_result launchAnalogKernel(const std::string &kernel_name,
+                                 const std::string &program,
+                                 std::size_t shots_count, std::size_t qpu_id) {
+  if (!cudaq::detail::isAnalogHamiltonianKernel(kernel_name))
+    throw std::runtime_error("Unexpected type of kernel.");
+
+  auto &platform = cudaq::get_platform();
+  sample_policy policy;
+  policy.options.shots = shots_count;
+  policy.kernelName = kernel_name;
+  ExecutionContext ctx(sample_policy::name, shots_count, qpu_id);
+  return detail::launch(policy, qpu_id, ctx, platform, [&]() {
+    [[maybe_unused]] auto dynamicResult = cudaq::altLaunchKernel(
+        kernel_name.c_str(), KernelThunkType(nullptr),
+        const_cast<char *>(program.c_str()), program.size(), 0);
+  });
+}
+
+async_sample_result launchAnalogKernelAsync(const std::string &kernel_name,
+                                            const std::string &program,
+                                            std::size_t shots_count,
+                                            std::size_t qpu_id) {
+  if (!cudaq::detail::isAnalogHamiltonianKernel(kernel_name))
+    throw std::runtime_error("Unexpected type of kernel.");
+
+  auto &platform = cudaq::get_platform();
+  async_sample_policy policy;
+  policy.inner.options.shots = shots_count;
+  policy.inner.kernelName = kernel_name;
+  ExecutionContext ctx(sample_policy::name, shots_count, qpu_id);
+  return detail::launch(policy, qpu_id, ctx, platform, [&]() {
+    [[maybe_unused]] auto dynamicResult = cudaq::altLaunchKernel(
+        kernel_name.c_str(), KernelThunkType(nullptr),
+        const_cast<char *>(program.c_str()), program.size(), 0);
+  });
+}
 
 evolve_result evolveSingle(const cudaq::rydberg_hamiltonian &hamiltonian,
                            const cudaq::schedule &schedule,
@@ -79,17 +118,8 @@ evolve_result evolveSingle(const cudaq::rydberg_hamiltonian &hamiltonian,
   auto programString = programJson.dump();
   CUDAQ_DBG("Program JSON: {}", programString);
 
-  auto &platform = cudaq::get_platform();
-  ExecutionContext ctx("sample", shots_count.value_or(100));
-  ctx.asyncExec = false;
-
-  platform.with_execution_context(ctx, [&]() {
-    auto dynamicResult = cudaq::altLaunchKernel(
-        programName.str().c_str(), KernelThunkType(nullptr),
-        (void *)(const_cast<char *>(programString.c_str())),
-        programString.size(), 0);
-  });
-  auto sampleResults = ctx.result;
+  auto sampleResults = launchAnalogKernel(programName.str(), programString,
+                                          shots_count.value_or(100), 0);
 
   return evolve_result(sampleResults);
 }

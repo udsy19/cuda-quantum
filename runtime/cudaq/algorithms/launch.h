@@ -65,8 +65,8 @@ auto launch(const Policy &policy, std::size_t qpu_id, ExecutionContext &ctx,
 
   typename Policy::result_type result;
   auto &qpu = platform.getRuntimeEndpoint(qpu_id);
-  ctx.executeKernelApi = [&qpu, &result, &policy](const AnyModule &module,
-                                                  const KernelArgs &args) {
+  ctx.executeKernelApi = [&qpu, &result, &policy, qpu_id](
+                             const AnyModule &module, const KernelArgs &args) {
     CompiledModule compiled;
     if (const auto *source = std::get_if<SourceModule>(&module)) {
 #ifdef CUDAQ_DISABLE_JIT_COMPILER

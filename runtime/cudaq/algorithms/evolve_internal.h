@@ -27,6 +27,16 @@ using async_evolve_result = std::future<evolve_result>;
 namespace detail {
 // Internal methods for evolve implementation on circuit simulators.
 
+sample_result launchAnalogKernel(const std::string &kernel_name,
+                                 const std::string &program,
+                                 std::size_t shots_count,
+                                 std::size_t qpu_id = 0);
+
+async_sample_result launchAnalogKernelAsync(const std::string &kernel_name,
+                                            const std::string &program,
+                                            std::size_t shots_count,
+                                            std::size_t qpu_id = 0);
+
 /// @brief Evolve from an initial state to the final state, no intermediate
 /// states.
 template <typename QuantumKernel>
