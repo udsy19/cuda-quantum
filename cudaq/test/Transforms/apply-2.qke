@@ -19,7 +19,7 @@ module {
     return
   }
   func.func @do_apply(%arg : !quake.ref, %brg : !quake.ref) {
-    quake.apply <adj> @test [%brg] %arg : (!quake.ref, !quake.ref) -> ()
+    quake.apply <adj> @test [%brg] (%arg) : (!quake.ref, !quake.ref) -> ()
     return
   }
 }

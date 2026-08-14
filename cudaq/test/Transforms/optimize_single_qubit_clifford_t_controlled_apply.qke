@@ -20,7 +20,7 @@ func.func @phase_sensitive(%arg0: !quake.ref) {
 }
 
 func.func @caller(%control: !quake.ref, %target: !quake.ref) {
-  quake.apply @phase_sensitive [%control] %target
+  quake.apply @phase_sensitive [%control] (%target)
       : (!quake.ref, !quake.ref) -> ()
   return
 }

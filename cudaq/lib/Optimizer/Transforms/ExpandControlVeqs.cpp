@@ -59,7 +59,6 @@ public:
         expandedControls.controls, op.getTargets(), negatedControlsAttr);
 
     newOp->setAttr(cudaq::runtime::operandSegmentSizes, segmentSizes);
-
     return success();
   }
 };

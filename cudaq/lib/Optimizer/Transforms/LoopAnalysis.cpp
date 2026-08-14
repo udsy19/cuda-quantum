@@ -330,7 +330,8 @@ bool opt::LoopComponents::stepIsAnAddOp() const {
 
 bool opt::LoopComponents::shouldCommuteStepOp() const {
   if (auto addOp = dyn_cast_or_null<arith::AddIOp>(stepOp))
-    return addOp.getRhs() == stepRegion->front().getArgument(induction);
+    if (induction.has_value())
+      return addOp.getRhs() == stepRegion->front().getArgument(*induction);
   // Note: we don't allow induction on lhs of subtraction.
   return false;
 }
@@ -696,7 +697,7 @@ std::optional<opt::LoopComponents> opt::getLoopComponents(cc::LoopOp loop) {
   if (!result.stepOp)
     return {};
 
-  result.initialValue = loop.getInitialArgs()[result.induction];
+  result.initialValue = loop.getInitialArgs()[*result.induction];
 
   // The comparison operation allows for the induction value to appear as part
   // of a loop-invariant linear expression on one side of the comparison. This
@@ -708,13 +709,80 @@ std::optional<opt::LoopComponents> opt::getLoopComponents(cc::LoopOp loop) {
   // and open those up to further analysis and transformations such as loop
   // unrolling.
   if (getLinearExpr(cmpOp.getLhs(), result, loop) ==
-      whileEntry.getArgument(result.induction))
+      whileEntry.getArgument(*result.induction))
     result.compareValue = cmpOp.getRhs();
   else if (getLinearExpr(cmpOp.getRhs(), result, loop) ==
-           whileEntry.getArgument(result.induction))
+           whileEntry.getArgument(*result.induction))
     result.compareValue = cmpOp.getLhs();
   else
     return {};
+  return result;
+}
+
+SmallVector<opt::SecondaryInduction>
+opt::getSecondaryInductions(cc::LoopOp loop, const LoopComponents &primary) {
+  SmallVector<SecondaryInduction> result;
+  // Requires the primary to have been identified in a concrete region.
+  if (!primary.stepRegion || !primary.induction.has_value())
+    return result;
+
+  Region *stepReg = primary.stepRegion;
+  unsigned primaryIdx = *primary.induction;
+
+  // Walk to the single exit block of the step region.
+  Block *termBlock = nullptr;
+  for (auto &block : *stepReg)
+    if (block.hasNoSuccessors()) {
+      termBlock = &block;
+      break;
+    }
+  if (!termBlock)
+    return result;
+
+  auto contOp = dyn_cast<cc::ContinueOp>(termBlock->back());
+  if (!contOp)
+    return result;
+
+  auto &stepEntry = stepReg->front();
+  unsigned numArgs = stepEntry.getNumArguments();
+
+  for (unsigned i = 0; i < numArgs; ++i) {
+    if (i == primaryIdx)
+      continue;
+    Value carried = contOp.getOperands()[i];
+    BlockArgument stepArg = stepEntry.getArgument(i);
+
+    auto *defOp = carried.getDefiningOp();
+    if (!defOp || defOp->getBlock() != termBlock)
+      continue;
+
+    Value stepVal;
+    bool isAdd = false;
+    if (auto addOp = dyn_cast<arith::AddIOp>(defOp)) {
+      if (addOp.getLhs() == stepArg) {
+        stepVal = addOp.getRhs();
+        isAdd = true;
+      } else if (addOp.getRhs() == stepArg) {
+        stepVal = addOp.getLhs();
+        isAdd = true;
+      }
+    } else if (auto subOp = dyn_cast<arith::SubIOp>(defOp)) {
+      if (subOp.getLhs() == stepArg) {
+        stepVal = subOp.getRhs();
+        isAdd = false;
+      }
+    }
+
+    if (!stepVal || !isLoopInvariant({stepVal}, loop))
+      continue;
+
+    SecondaryInduction ind;
+    ind.argIndex = i;
+    ind.initialValue = loop.getInitialArgs()[i];
+    ind.stepValue = stepVal;
+    ind.stepIsAdd = isAdd;
+    result.push_back(ind);
+  }
   return result;
 }
 

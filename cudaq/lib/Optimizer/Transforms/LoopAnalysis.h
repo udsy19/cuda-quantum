@@ -38,7 +38,7 @@ struct LoopComponents {
 
   std::int64_t extendValue(unsigned width, std::size_t val) const;
 
-  unsigned induction = 0;
+  std::optional<unsigned> induction = std::nullopt;
   mlir::Value initialValue;
   mlir::Operation *compareOp = nullptr;
   mlir::Value compareValue;
@@ -155,6 +155,30 @@ inline bool isaIndefiniteMonotonicLoop(mlir::Operation *op,
                                        LoopComponents *c = nullptr) {
   return isaMonotonicLoop(op, /*allowEarlyExit=*/true, c);
 }
+
+/// A secondary induction variable is a loop argument other than the primary
+/// control induction that steps by a loop-invariant amount on every iteration.
+/// Because the primary has been normalized to start at 0 and step by 1, the
+/// secondary can be expressed as a closed-form linear function of the primary:
+///
+///   j(i) = initialValue + i * stepValue   (stepIsAdd == true)
+///   j(i) = initialValue - i * stepValue   (stepIsAdd == false)
+///
+/// This allows the secondary to be computed on-the-fly from the primary
+/// instead of being threaded around the loop as an extra carried value.
+struct SecondaryInduction {
+  unsigned argIndex;        // Position of this arg in the loop's arg list.
+  mlir::Value initialValue; // Value of j before the first iteration (j_0).
+  mlir::Value stepValue;    // Loop-invariant amount added/subtracted per iter.
+  bool stepIsAdd;           // true → j += step each iter; false → j -= step.
+};
+
+/// Find all secondary inductions in \p loop given that \p primary describes
+/// the primary control induction.  The loop must be in invariant (normalized)
+/// form — i.e., the primary starts at 0 and steps by 1 — otherwise the
+/// closed-form j(i) derivation is invalid.
+mlir::SmallVector<SecondaryInduction>
+getSecondaryInductions(cc::LoopOp loop, const LoopComponents &primary);
 
 /// Recover the different subexpressions from the loop if it conforms to the
 /// pattern. Given a LoopOp where induction is in a register:
