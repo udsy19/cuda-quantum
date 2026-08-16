@@ -28,9 +28,6 @@ namespace cudaq::opt {
 
 using namespace mlir;
 
-// MLIR dependency: internal name used by tablegen.
-static constexpr const char segmentSizes[] = "operandSegmentSizes";
-
 namespace {
 /// A Quake ApplyOp can indicate any of the following: a regular call to a
 /// Callable (kernel), a call to a variant of a Callable with some control
