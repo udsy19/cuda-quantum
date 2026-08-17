@@ -73,7 +73,7 @@ if (CUDA_FOUND)
       cudaq-logger
       CUDAQTargetConfig
     PRIVATE
-      cudaqMLIR
+      cudaq-mlir-runtime
       nvqir
       fmt::fmt-header-only
       CUDA::cudart_static
@@ -100,7 +100,7 @@ else()
       cudaq-logger
       CUDAQTargetConfig
     PRIVATE
-      cudaqMLIR
+      cudaq-mlir-runtime
       nvqir
       fmt::fmt-header-only
       CUDAQTargetConfigYaml
